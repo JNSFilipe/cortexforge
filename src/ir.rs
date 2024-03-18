@@ -1,4 +1,8 @@
+use std::collections::HashMap;
 use std::convert::From;
+
+// TODO: Save the intermeditate representation to a file
+// (do a binary file by default, but allow text, for readability)
 
 #[repr(u8)]
 #[derive(Debug)]
@@ -32,11 +36,17 @@ impl From<u8> for Token {
 struct Operation {
     token: Token,
     count: u32,
+    match_addr: u32,
 }
 
 struct Source {
     data: String,
     pointer: usize,
+}
+
+pub enum SegFaultError {
+    OutOfBounds,
+    InvalidToken,
 }
 
 impl Source {
@@ -49,10 +59,18 @@ impl Source {
     }
 
     fn next(&mut self) -> u8 {
+        // TODO. Use Result to handle errors, like is done at the at() function
         if self.pointer + 1 >= self.data.len() {
             return 0;
         }
         self.data.as_bytes()[self.pointer + 1]
+    }
+
+    fn at(&mut self, index: usize) -> Result<Token, SegFaultError> {
+        if index >= self.data.len() {
+            return Err(SegFaultError::OutOfBounds);
+        }
+        Ok(Token::from(self.data.as_bytes()[index]))
     }
 
     fn increment(&mut self) {
@@ -72,7 +90,7 @@ impl std::fmt::Debug for IntermRep {
                 }
                 Token::LOOP | Token::POOL => {
                     // TODO: Maybe print jump address?
-                    writeln!(f, "{:?}", operation.token)?;
+                    writeln!(f, "{:?}\t{{{}}}", operation.token, operation.match_addr)?;
                 }
                 Token::INPUT | Token::OUTPUT => {
                     writeln!(f, "{:?}", operation.token)?;
@@ -85,6 +103,8 @@ impl std::fmt::Debug for IntermRep {
 
 fn parser(src: &mut Source) -> IntermRep {
     let mut operations = Vec::new();
+    //                           <closing_idx, opening_idx>
+    let mut back_jump_table = HashMap::<usize, usize>::new();
     while src.pointer < src.data.len() {
         let token = src.curr();
 
@@ -99,16 +119,54 @@ fn parser(src: &mut Source) -> IntermRep {
                 operations.push(Operation {
                     token: Token::from(token),
                     count: count,
+                    match_addr: 0,
                 });
 
                 src.increment();
             }
-            b'[' | b']' => {
-                // TODO: Must find closing bracket in here
+            b'[' => {
+                // TODO: Maybe implement this with a forward jump table? Eitherway, this is a bit ugly
+                let mut matching: u8 = 1;
+                let mut ptr = src.pointer;
+                while matching > 0 {
+                    ptr += 1;
+                    let curr = src.at(ptr);
+                    match curr {
+                        Ok(c) => match c {
+                            Token::LOOP => matching += 1,
+                            Token::POOL => matching -= 1,
+                            _ => (),
+                        },
+                        Err(_) => panic!(
+                            "Unmatched brackets at {} (failed at foward search)",
+                            src.pointer
+                        ),
+                    }
+                }
                 operations.push(Operation {
                     token: Token::from(token),
                     count: 1,
+                    match_addr: ptr as u32,
                 });
+                back_jump_table.insert(ptr, src.pointer);
+                src.increment();
+            }
+            b']' => {
+                let match_addr = back_jump_table.get(&src.pointer);
+                println!("match_addr: {:?}", back_jump_table);
+                match match_addr {
+                    Some(addr) => {
+                        operations.push(Operation {
+                            token: Token::from(token),
+                            count: 1,
+                            match_addr: *addr as u32,
+                        });
+                    }
+                    None => panic!(
+                        "Unmatched brackets at {} (not present at jump table)",
+                        src.pointer
+                    ),
+                }
 
                 src.increment();
             }
@@ -116,6 +174,7 @@ fn parser(src: &mut Source) -> IntermRep {
                 operations.push(Operation {
                     token: Token::from(token),
                     count: 1,
+                    match_addr: 0,
                 });
 
                 src.increment();

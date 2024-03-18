@@ -7,9 +7,9 @@ fn main() {
     let file = "hello_world.bf";
     let mut data = read_file(file);
     data = filter_chars(&data);
+    println!("\n{}\n\n", data);
 
     let ir = str_to_ir(data.clone());
 
-    println!("\n{}\n\n", data);
     println!("{:?}", ir);
 }
