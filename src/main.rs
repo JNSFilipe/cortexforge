@@ -1,5 +1,7 @@
+mod interpreter;
 mod ir;
 mod utils;
+use interpreter::Interpreter;
 use ir::str_to_ir;
 use utils::{filter_chars, read_file};
 
@@ -12,4 +14,5 @@ fn main() {
     let ir = str_to_ir(data.clone());
 
     println!("{:?}", ir);
+    Interpreter::new(ir).run();
 }

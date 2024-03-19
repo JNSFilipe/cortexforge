@@ -2,6 +2,7 @@ use std::convert::From;
 
 // TODO: Save the intermeditate representation to a file
 // (do a binary file by default, but allow text, for readability)
+// TODO: Use wrapping adds and subtractions to prevent overflows
 
 #[repr(u8)]
 #[derive(Debug)]
