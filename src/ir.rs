@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::From;
 
 // TODO: Save the intermeditate representation to a file
@@ -6,7 +5,7 @@ use std::convert::From;
 
 #[repr(u8)]
 #[derive(Debug)]
-enum Token {
+pub enum Token {
     INC = b'+',
     DEC = b'-',
     LEFT = b'<',
@@ -33,20 +32,20 @@ impl From<u8> for Token {
     }
 }
 
-struct Operation {
-    token: Token,
-    count: u32,
-    match_addr: u32,
-}
-
-struct Source {
-    data: String,
-    pointer: usize,
+pub struct Operation {
+    pub token: Token,
+    pub count: u32,
+    pub match_addr: u32,
 }
 
 pub enum SegFaultError {
     OutOfBounds,
     InvalidToken,
+}
+
+struct Source {
+    data: String,
+    pointer: usize,
 }
 
 impl Source {
@@ -79,21 +78,23 @@ impl Source {
 }
 
 pub struct IntermRep {
-    operations: Vec<Operation>,
+    pub operations: Vec<Operation>,
 }
 impl std::fmt::Debug for IntermRep {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for operation in &self.operations {
-            match operation.token {
+        // for operation in &self.operations {
+        for i in 0..self.operations.len() {
+            let op = &self.operations[i];
+            match op.token {
                 Token::INC | Token::DEC | Token::LEFT | Token::RIGHT => {
-                    writeln!(f, "{:?}\t({})", operation.token, operation.count)?;
+                    writeln!(f, "{}:\t{:?}\t({})", i, op.token, op.count)?;
                 }
                 Token::LOOP | Token::POOL => {
                     // TODO: Maybe print jump address?
-                    writeln!(f, "{:?}\t{{{}}}", operation.token, operation.match_addr)?;
+                    writeln!(f, "{}:\t{:?}\t{{{}}}", i, op.token, op.match_addr)?;
                 }
                 Token::INPUT | Token::OUTPUT => {
-                    writeln!(f, "{:?}", operation.token)?;
+                    writeln!(f, "{}:\t{:?}", i, op.token)?;
                 }
             }
         }
@@ -103,8 +104,7 @@ impl std::fmt::Debug for IntermRep {
 
 fn parser(src: &mut Source) -> IntermRep {
     let mut operations = Vec::new();
-    //                           <closing_idx, opening_idx>
-    let mut back_jump_table = HashMap::<usize, usize>::new();
+    let mut jump_stack = Vec::new();
     while src.pointer < src.data.len() {
         let token = src.curr();
 
@@ -125,47 +125,26 @@ fn parser(src: &mut Source) -> IntermRep {
                 src.increment();
             }
             b'[' => {
-                // TODO: Maybe implement this with a forward jump table? Eitherway, this is a bit ugly
-                let mut matching: u8 = 1;
-                let mut ptr = src.pointer;
-                while matching > 0 {
-                    ptr += 1;
-                    let curr = src.at(ptr);
-                    match curr {
-                        Ok(c) => match c {
-                            Token::LOOP => matching += 1,
-                            Token::POOL => matching -= 1,
-                            _ => (),
-                        },
-                        Err(_) => panic!(
-                            "Unmatched brackets at {} (failed at foward search)",
-                            src.pointer
-                        ),
-                    }
-                }
                 operations.push(Operation {
                     token: Token::from(token),
                     count: 1,
-                    match_addr: ptr as u32,
+                    match_addr: 1,
                 });
-                back_jump_table.insert(ptr, src.pointer);
+
+                jump_stack.push(operations.len() - 1);
                 src.increment();
             }
             b']' => {
-                let match_addr = back_jump_table.get(&src.pointer);
-                println!("match_addr: {:?}", back_jump_table);
-                match match_addr {
+                match jump_stack.pop() {
                     Some(addr) => {
                         operations.push(Operation {
                             token: Token::from(token),
                             count: 1,
-                            match_addr: *addr as u32,
+                            match_addr: addr as u32,
                         });
+                        operations[addr].match_addr = (operations.len() as u32) - 1;
                     }
-                    None => panic!(
-                        "Unmatched brackets at {} (not present at jump table)",
-                        src.pointer
-                    ),
+                    None => panic!("Unmatched brackets at {} (stack empty)", src.pointer),
                 }
 
                 src.increment();
@@ -184,6 +163,11 @@ fn parser(src: &mut Source) -> IntermRep {
             }
         }
     }
+
+    if !jump_stack.is_empty() {
+        panic!("Unmatched brackets at {} (stack not empty)", src.pointer);
+    }
+
     IntermRep { operations }
 }
 
