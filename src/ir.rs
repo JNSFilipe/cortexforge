@@ -1,11 +1,13 @@
 use std::convert::From;
+use std::fs::{read_to_string, File};
+use std::io::prelude::*;
 
 // TODO: Save the intermeditate representation to a file
 // (do a binary file by default, but allow text, for readability)
 // TODO: Use wrapping adds and subtractions to prevent overflows
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
     INC = b'+',
     DEC = b'-',
@@ -33,15 +35,17 @@ impl From<u8> for Token {
     }
 }
 
+#[derive(Clone)]
 pub struct Operation {
     pub token: Token,
     pub count: u32,
     pub match_addr: u32,
 }
 
-pub enum SegFaultError {
+pub enum Error {
     OutOfBounds,
     InvalidToken,
+    EmptyInstructions,
 }
 
 struct Source {
@@ -66,9 +70,9 @@ impl Source {
         self.data.as_bytes()[self.pointer + 1]
     }
 
-    fn at(&mut self, index: usize) -> Result<Token, SegFaultError> {
+    fn at(&mut self, index: usize) -> Result<Token, Error> {
         if index >= self.data.len() {
-            return Err(SegFaultError::OutOfBounds);
+            return Err(Error::OutOfBounds);
         }
         Ok(Token::from(self.data.as_bytes()[index]))
     }
@@ -78,6 +82,7 @@ impl Source {
     }
 }
 
+#[derive(Clone)]
 pub struct IntermRep {
     pub operations: Vec<Operation>,
 }
@@ -104,7 +109,7 @@ impl std::fmt::Debug for IntermRep {
 }
 
 impl IntermRep {
-    pub fn new(data: String) -> IntermRep {
+    pub fn new() -> IntermRep {
         IntermRep {
             operations: Vec::new(),
         }
@@ -170,5 +175,89 @@ impl IntermRep {
         }
 
         self.operations = operations;
+    }
+
+    pub fn to_compiled_file(&self, path: &str) -> Result<(), Error> {
+        let mut file = File::create(path).expect("Unable to create file");
+        for op in &self.operations {
+            match op.token {
+                Token::LOOP | Token::POOL => {
+                    writeln!(file, "{:?} {}", op.token, op.match_addr)
+                        .expect("Unable to write to file");
+                }
+                _ => {
+                    writeln!(file, "{:?} {}", op.token, op.count).expect("Unable to write to file");
+                }
+            }
+        }
+        if self.operations.is_empty() {
+            return Err(Error::EmptyInstructions);
+        }
+        Ok(())
+    }
+
+    pub fn to_compiled_binary() {
+        todo!()
+    }
+
+    pub fn from_compiled_file(&mut self, path: &str) -> Result<(), Error> {
+        let mut result = Vec::new();
+
+        for line in read_to_string(path).expect("Unable to read file").lines() {
+            let parts = line.split(" ").collect::<Vec<&str>>();
+            match parts[0] {
+                "INC" => {
+                    result.push(Operation {
+                        token: Token::INC,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
+                "DEC" => {
+                    result.push(Operation {
+                        token: Token::DEC,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
+                "RIGHT" => {
+                    result.push(Operation {
+                        token: Token::RIGHT,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
+                "LEFT" => {
+                    result.push(Operation {
+                        token: Token::LEFT,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
+                "LOOP" => {
+                    result.push(Operation {
+                        token: Token::LOOP,
+                        count: 1,
+                        match_addr: parts[1].parse().expect("Unable to parse argument"),
+                    });
+                }
+                "POOL" => {
+                    result.push(Operation {
+                        token: Token::POOL,
+                        count: 1,
+                        match_addr: parts[1].parse().expect("Unable to parse argument"),
+                    });
+                }
+                _ => {
+                    panic!("Invalid Token {}", parts[0]);
+                }
+            }
+        }
+        self.operations = result;
+        Ok(())
+    }
+
+    pub fn from_compiled_binary() {
+        todo!()
     }
 }
