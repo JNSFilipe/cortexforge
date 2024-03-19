@@ -103,67 +103,72 @@ impl std::fmt::Debug for IntermRep {
     }
 }
 
-fn parser(src: &mut Source) -> IntermRep {
-    let mut operations = Vec::new();
-    let mut jump_stack = Vec::new();
-    while src.pointer < src.data.len() {
-        let token = src.curr();
-
-        match token {
-            b'+' | b'-' | b'<' | b'>' | b',' | b'.' => {
-                let mut count = 1;
-                while src.next() == token {
-                    count += 1;
-                    src.increment();
-                }
-
-                operations.push(Operation {
-                    token: Token::from(token),
-                    count: count,
-                    match_addr: 0,
-                });
-
-                src.increment();
-            }
-            b'[' => {
-                operations.push(Operation {
-                    token: Token::from(token),
-                    count: 1,
-                    match_addr: 1,
-                });
-
-                jump_stack.push(operations.len() - 1);
-                src.increment();
-            }
-            b']' => {
-                match jump_stack.pop() {
-                    Some(addr) => {
-                        operations.push(Operation {
-                            token: Token::from(token),
-                            count: 1,
-                            match_addr: addr as u32,
-                        });
-                        operations[addr].match_addr = (operations.len() as u32) - 1;
-                    }
-                    None => panic!("Unmatched brackets at {} (stack empty)", src.pointer),
-                }
-
-                src.increment();
-            }
-            _ => {
-                panic!("Unkwon Instruction {}: Something went really wrong", token);
-            }
+impl IntermRep {
+    pub fn new(data: String) -> IntermRep {
+        IntermRep {
+            operations: Vec::new(),
         }
     }
 
-    if !jump_stack.is_empty() {
-        panic!("Unmatched brackets at {} (stack not empty)", src.pointer);
+    pub fn from_source_string(&mut self, data: String) {
+        let mut src = Source::new(data);
+
+        let mut operations = Vec::new();
+        let mut jump_stack = Vec::new();
+        while src.pointer < src.data.len() {
+            let token = src.curr();
+
+            match token {
+                b'+' | b'-' | b'<' | b'>' | b',' | b'.' => {
+                    let mut count = 1;
+                    while src.next() == token {
+                        count += 1;
+                        src.increment();
+                    }
+
+                    operations.push(Operation {
+                        token: Token::from(token),
+                        count: count,
+                        match_addr: 0,
+                    });
+
+                    src.increment();
+                }
+                b'[' => {
+                    operations.push(Operation {
+                        token: Token::from(token),
+                        count: 1,
+                        match_addr: 1,
+                    });
+
+                    jump_stack.push(operations.len() - 1);
+                    src.increment();
+                }
+                b']' => {
+                    match jump_stack.pop() {
+                        Some(addr) => {
+                            operations.push(Operation {
+                                token: Token::from(token),
+                                count: 1,
+                                match_addr: addr as u32,
+                            });
+                            operations[addr].match_addr = (operations.len() as u32) - 1;
+                        }
+                        None => panic!("Unmatched brackets at {} (stack empty)", src.pointer),
+                    }
+
+                    src.increment();
+                }
+                _ => {
+                    panic!("Unkwon Instruction {}: Something went really wrong", token);
+                }
+            }
+        }
+
+        if !jump_stack.is_empty() {
+            panic!("Unmatched brackets at {} (stack not empty)", src.pointer);
+        }
+
+        self.operations = operations;
     }
-
-    IntermRep { operations }
-}
-
-pub fn str_to_ir(data: String) -> IntermRep {
-    let mut src = Source::new(data);
-    parser(&mut src)
 }

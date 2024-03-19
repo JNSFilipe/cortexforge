@@ -2,7 +2,7 @@ mod interpreter;
 mod ir;
 mod utils;
 use interpreter::Interpreter;
-use ir::str_to_ir;
+use ir::IntermRep;
 use utils::{filter_chars, read_file};
 
 fn main() {
@@ -11,7 +11,8 @@ fn main() {
     data = filter_chars(&data);
     println!("\n{}\n\n", data);
 
-    let ir = str_to_ir(data.clone());
+    let mut ir = IntermRep::new(data.clone());
+    ir.from_source_string(data);
 
     println!("{:?}", ir);
     Interpreter::new(ir).run();
