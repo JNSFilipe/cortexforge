@@ -109,7 +109,7 @@ fn parser(src: &mut Source) -> IntermRep {
         let token = src.curr();
 
         match token {
-            b'+' | b'-' | b'<' | b'>' => {
+            b'+' | b'-' | b'<' | b'>' | b',' | b'.' => {
                 let mut count = 1;
                 while src.next() == token {
                     count += 1;
@@ -149,17 +149,8 @@ fn parser(src: &mut Source) -> IntermRep {
 
                 src.increment();
             }
-            b',' | b'.' => {
-                operations.push(Operation {
-                    token: Token::from(token),
-                    count: 1,
-                    match_addr: 0,
-                });
-
-                src.increment();
-            }
             _ => {
-                src.increment();
+                panic!("Unkwon Instruction {}: Something went really wrong", token);
             }
         }
     }
