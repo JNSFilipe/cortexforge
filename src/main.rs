@@ -18,7 +18,7 @@ fn main() {
     println!("{:?}", ir);
     Interpreter::new(ir.clone()).run();
 
-    ir.to_compiled_file("./compiled.cf");
+    ir.from_compiled_file("./compiled.cf");
     println!("\n{:?}", ir);
     Interpreter::new(ir.clone()).run();
 }

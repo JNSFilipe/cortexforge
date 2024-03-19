@@ -234,6 +234,20 @@ impl IntermRep {
                         match_addr: 0,
                     });
                 }
+                "OUTPUT" => {
+                    result.push(Operation {
+                        token: Token::OUTPUT,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
+                "INPUT" => {
+                    result.push(Operation {
+                        token: Token::INPUT,
+                        count: parts[1].parse().expect("Unable to parse argument"),
+                        match_addr: 0,
+                    });
+                }
                 "LOOP" => {
                     result.push(Operation {
                         token: Token::LOOP,
