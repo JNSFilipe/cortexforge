@@ -1,13 +1,12 @@
+use serde::{Deserialize, Serialize};
 use std::convert::From;
 use std::fs::{read_to_string, File};
-use std::io::prelude::*;
+use std::io::{Read, Write};
 
-// TODO: Save the intermeditate representation to a file
-// (do a binary file by default, but allow text, for readability)
 // TODO: Use wrapping adds and subtractions to prevent overflows
 
 #[repr(u8)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Token {
     INC = b'+',
     DEC = b'-',
@@ -35,13 +34,14 @@ impl From<u8> for Token {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Operation {
     pub token: Token,
     pub count: u32,
     pub match_addr: u32,
 }
 
+// TODO: Put this on the utils file
 pub enum Error {
     OutOfBounds,
     InvalidToken,
@@ -196,8 +196,11 @@ impl IntermRep {
         Ok(())
     }
 
-    pub fn to_compiled_binary() {
-        todo!()
+    pub fn to_compiled_binary(&self, path: &str) -> Result<(), Error> {
+        let encoded: Vec<u8> = bincode::serialize(&self.operations).expect("Unable to serialize");
+        let mut file = File::create(path).expect("Unable to create file");
+        file.write_all(&encoded).expect("Unable to write to file");
+        Ok(())
     }
 
     pub fn from_compiled_file(&mut self, path: &str) -> Result<(), Error> {
@@ -271,7 +274,13 @@ impl IntermRep {
         Ok(())
     }
 
-    pub fn from_compiled_binary() {
-        todo!()
+    pub fn from_compiled_binary(&mut self, path: &str) -> Result<(), Error> {
+        let mut file = File::open(path).expect("Unable to open file");
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).expect("Unable to read file");
+        let operations = bincode::deserialize(&buffer).expect("Unable to deserialize");
+
+        self.operations = operations;
+        Ok(())
     }
 }
