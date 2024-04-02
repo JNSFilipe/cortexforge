@@ -1,8 +1,12 @@
 use crate::ir::{IntermRep, Token};
 use inkwell::context::Context;
 use inkwell::module::Linkage;
+use inkwell::targets::{
+    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
+};
+use inkwell::OptimizationLevel;
 
-struct Compiler {
+pub struct Compiler {
     ir: IntermRep,
 }
 
@@ -11,7 +15,7 @@ impl Compiler {
         Compiler { ir }
     }
 
-    pub fn compile(&self) {
+    pub fn compile(&mut self) {
         let context = Context::create();
         let module = context.create_module("cortexforge");
         let builder = context.create_builder();
@@ -26,16 +30,45 @@ impl Compiler {
         let basic_block = context.append_basic_block(fn_main, "entry");
         builder.position_at_end(basic_block);
 
-        // let i32_zero = i32_type.const_zero();
-        // let i32_one = i32_type.const_int(1, false);
-        // let i32_two = i32_type.const_int(2, false);
+        // Return zero
+        let i32_zero = i32_type.const_int(0, false);
+        builder.build_return(Some(&i32_zero));
 
-        // let add = builder.build_int_add(i32_one, i32_two, "add");
-        // let sub = builder.build_int_sub(add, i32_one, "sub");
-        // let mul = builder.build_int_mul(sub, i32_two, "mul");
-        // let div = builder.build_int_unsigned_div(mul, i32_two, "div");
+        self.produce_executable(module);
+    }
 
-        // builder.build_return(Some(&div));
-        // module.print_to_file("output.ll").unwrap();
+    fn produce_executable(&self, module: inkwell::module::Module) {
+        Target::initialize_all(&InitializationConfig::default());
+        // use the host machine as the compilation target
+        let target_triple = TargetMachine::get_default_triple();
+        let cpu = TargetMachine::get_host_cpu_name().to_string();
+        let features = TargetMachine::get_host_cpu_features().to_string();
+
+        // make a target from the triple
+        let target = Target::from_triple(&target_triple)
+            .map_err(|e| format!("{:?}", e))
+            .unwrap();
+
+        // make a machine from the target
+        let target_machine = target
+            .create_target_machine(
+                &target_triple,
+                &cpu,
+                &features,
+                OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .ok_or_else(|| "Unable to create target machine!".to_string())
+            .unwrap();
+
+        // use the machine to convert our module to machine code and write the result to a file
+        let output_filename = "out.a";
+        target_machine
+            .write_to_file(&module, FileType::Object, output_filename.as_ref())
+            .map_err(|e| format!("{:?}", e))
+            .unwrap();
+
+        // TODO: call gcc to link the object file as explained in https://benkonz.github.io/building-a-brainfuck-compiler-with-rust-and-llvm/
     }
 }

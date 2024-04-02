@@ -1,6 +1,8 @@
+mod compiler;
 mod interpreter;
 mod ir;
 mod utils;
+use compiler::Compiler;
 use interpreter::Interpreter;
 use ir::IntermRep;
 use utils::{filter_chars, read_file};
@@ -28,4 +30,8 @@ fn main() {
     let _ = ir.from_compiled_binary("./compiled.cfb");
     println!("\n{:?}", ir);
     Interpreter::new(ir.clone()).run();
+
+    // Try compiler
+    let mut compiler = Compiler::new(ir);
+    compiler.compile();
 }
